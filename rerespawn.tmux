@@ -14,7 +14,7 @@ main() {
   local -a extra_args
 
   local wrap
-  wrap="$(get_tmux_option @respawn-wrap)"
+  wrap="$(get_tmux_option @rerespawn-wrap)"
 
   case "$wrap" in
     true|1|yes)
@@ -23,7 +23,7 @@ main() {
   esac
 
   local key
-  key="$(get_tmux_option @respawn-key)"
+  key="$(get_tmux_option @rerespawn-key)"
 
   if [[ -n "$key" ]]
   then
