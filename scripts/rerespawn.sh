@@ -35,7 +35,7 @@ get_pane_path_from_pane_id() {
     sed -rn "s/^${1} (.+)/\1/p"
 }
 
-get_command() {
+get_pane_command() {
   local child_cmd
   local pane_id
   local pane_pid
@@ -50,23 +50,22 @@ get_command() {
   fi
 
   local shell
-  shell=$(basename "$SHELL")
-
-  if [[ -z "$shell" ]]
-  then
-    shell=bash
-  fi
+  shell="$(get_default_shell)"
 
   ps -o pid=,command= -g "${pane_pid}" | while read -r child_pid child_cmd
   do
     if [[ -n "$DEBUG" ]]
     then
-      echo "Probing ($child_pid) -> $child_cmd" >&2
+      echo -n "Checking ($child_pid) -> $child_cmd" >&2
     fi
 
     case "$child_cmd" in
       # -zsh|/home/pschmitt/.cache/gitstatus/gitstatusd-linux-x86_64 ...
       -"${shell}"|-"$(basename "$shell")"|"${SHELL}"|*gitstatusd-*|*"$0"*)
+        if [[ -n "$DEBUG" ]]
+        then
+          echo " [SKIP]" >&2
+        fi
         continue
         ;;
     esac
@@ -77,15 +76,13 @@ get_command() {
     then
       if [[ -n "$DEBUG" ]]
       then
-        echo "Child PID is ALIVE: ($child_pid) -> $child_cmd" >&2
+        echo " [!ALIVE!]" >&2
       fi
 
       echo "$child_cmd"
       return
     fi
   done
-
-  return 1
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]
@@ -116,7 +113,11 @@ then
   done
 
   pane_id="$1"
-  pane_cmd=$(get_command "$pane_id")
+  if ! pane_cmd=$(get_pane_command "$pane_id")
+  then
+    exit 1
+  fi
+
   default_shell="$(get_default_shell)"
 
   if [[ -z "$pane_cmd" ]]
