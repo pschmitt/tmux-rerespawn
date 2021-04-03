@@ -30,7 +30,7 @@ main() {
     local current_dir
     local script_path
     current_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    script_path="${current_dir}/scripts/respawn.sh"
+    script_path="${current_dir}/scripts/rerespawn.sh"
 
     tmux unbind "$key"
     tmux bind-key "$key" run "${script_path} ${extra_args[*]}"
