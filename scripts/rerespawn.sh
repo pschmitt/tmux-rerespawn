@@ -75,8 +75,6 @@ get_pane_command() {
     # The kill -0 check will return true, even if nvim is not running any more
     # -> nvim will be in the foreground after rerespawning the pane even though
     # the user quit nvim
-    # FIXME Shouldn't we return here, if the child cmd is not alive so that we
-    # spawn a new shell instead of whatever is running under the dead PID?
     if kill -0 "$child_pid"
     then
       if [[ -n "$DEBUG" ]]
@@ -86,6 +84,10 @@ get_pane_command() {
 
       echo "$child_cmd"
       return
+    # FIXME Shouldn't we return here, if the child cmd is not alive so that we
+    # spawn a new shell instead of whatever is running under the dead PID?
+    # else
+    #   return
     fi
   done
 }
