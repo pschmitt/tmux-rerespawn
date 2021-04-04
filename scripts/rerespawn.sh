@@ -35,24 +35,18 @@ get_pane_path_from_pane_id() {
     sed -rn "s/^${1} (.+)/\1/p"
 }
 
-get_pane_command() {
+get_command_from_pid() {
+  local pid="$1"
+
+  local child_pid
   local child_cmd
-  local pane_id
-  local pane_pid
-
-  pane_id="${1:-$(get_current_pane_id)}"
-  pane_pid="$(get_pane_pid_from_pane_id "$pane_id")"
-
-  if [[ -z "$pane_pid" ]]
-  then
-    echo "Could not determine pane PID" >&2
-    return 3
-  fi
 
   local shell
   shell="$(get_default_shell)"
 
-  ps -o pid=,command= -g "${pane_pid}" | while read -r child_pid child_cmd
+  # shellcheck disable=2009
+  ps -o pid=,command= -g "${pid}" | grep -v "^${pid} " | \
+    while read -r child_pid child_cmd
   do
     if [[ -n "$DEBUG" ]]
     then
@@ -82,47 +76,6 @@ get_pane_command() {
         echo " [!ALIVE!]" >&2
       fi
 
-      local grand_child_pid grand_child_cmd
-
-      if [[ "$child_cmd" == *TMUX_RERESPAWN=1* ]]
-      then
-        if [[ -n "$DEBUG" ]]
-        then
-          echo "Detected Re-respawned pane. Processing grand children." >&2
-        fi
-        ps -o pid=,command= -g "${child_pid}" | grep -v "^${child_pid} " | \
-          while read -r grand_child_pid grand_child_cmd
-        do
-          if [[ -n "$DEBUG" ]]
-          then
-            echo -n "Checking ($grand_child_pid) -> $grand_child_cmd" >&2
-          fi
-
-          case "$grand_child_cmd" in
-            # -zsh|/home/pschmitt/.cache/gitstatus/gitstatusd-linux-x86_64 ...
-            -"${shell}"|-"$(basename "$shell")"|"${SHELL}"|*gitstatusd-*|*"$0"*)
-              if [[ -n "$DEBUG" ]]
-              then
-                echo " [SKIP]" >&2
-              fi
-              continue
-              ;;
-          esac
-
-          if kill -0 "$grand_child_pid"
-          then
-            if [[ -n "$DEBUG" ]]
-            then
-              echo " [!ALIVE!]" >&2
-            fi
-            echo "$grand_child_cmd"
-            return
-          fi
-        done
-
-        return
-      fi
-
       echo "$child_cmd"
       return
     # FIXME Shouldn't we return here, if the child cmd is not alive so that we
@@ -131,6 +84,48 @@ get_pane_command() {
     #   return
     fi
   done
+}
+
+get_pane_command() {
+  local child_cmd
+  local pane_id
+  local pane_pid
+
+  pane_id="${1:-$(get_current_pane_id)}"
+  pane_pid="$(get_pane_pid_from_pane_id "$pane_id")"
+
+  if [[ -z "$pane_pid" ]]
+  then
+    echo "Could not determine pane PID" >&2
+    return 3
+  fi
+
+  read -r child_pid child_cmd < <(get_command_from_pid "$pane_pid")
+
+  if [[ -z "$child_pid" ]]
+  then
+    return
+  fi
+
+  if [[ "$child_cmd" == *TMUX_RERESPAWN=1* ]]
+  then
+    if [[ -n "$DEBUG" ]]
+    then
+      echo "Detected Re-respawned pane. Processing grand children." >&2
+    fi
+
+    local grand_child_cmd
+    read -r _ grand_child_cmd < <(get_command_from_pid "$child_pid")
+
+    if [[ -n "$grand_child_cmd" ]]
+    then
+      echo "$grand_child_cmd"
+    fi
+
+    return
+  fi
+
+  echo "$child_cmd"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]
