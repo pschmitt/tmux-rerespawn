@@ -82,6 +82,47 @@ get_pane_command() {
         echo " [!ALIVE!]" >&2
       fi
 
+      local grand_child_pid grand_child_cmd
+
+      if [[ "$child_cmd" == *TMUX_RERESPAWN=1* ]]
+      then
+        if [[ -n "$DEBUG" ]]
+        then
+          echo "Detected Re-respawned pane. Processing grand children." >&2
+        fi
+        ps -o pid=,command= -g "${child_pid}" | grep -v "^${child_pid} " | \
+          while read -r grand_child_pid grand_child_cmd
+        do
+          if [[ -n "$DEBUG" ]]
+          then
+            echo -n "Checking ($grand_child_pid) -> $grand_child_cmd" >&2
+          fi
+
+          case "$grand_child_cmd" in
+            # -zsh|/home/pschmitt/.cache/gitstatus/gitstatusd-linux-x86_64 ...
+            -"${shell}"|-"$(basename "$shell")"|"${SHELL}"|*gitstatusd-*|*"$0"*)
+              if [[ -n "$DEBUG" ]]
+              then
+                echo " [SKIP]" >&2
+              fi
+              continue
+              ;;
+          esac
+
+          if kill -0 "$grand_child_pid"
+          then
+            if [[ -n "$DEBUG" ]]
+            then
+              echo " [!ALIVE!]" >&2
+            fi
+            echo "$grand_child_cmd"
+            return
+          fi
+        done
+
+        return
+      fi
+
       echo "$child_cmd"
       return
     # FIXME Shouldn't we return here, if the child cmd is not alive so that we
@@ -154,7 +195,7 @@ then
   then
     if [[ -n "$WRAP" ]]
     then
-      cmd_prefix="trap \"${default_shell}\" EXIT INT"
+      cmd_prefix="TMUX_RERESPAWN=1; trap \"${default_shell}\" EXIT INT"
 
       # Avoid prefixing an already prefixed command (when respawning the same
       # pane 2+ times)
@@ -165,6 +206,13 @@ then
     fi
 
     extra_args+=("$pane_cmd")
+  else
+    # Explicitely set the command to the user's default shell
+    # Without any command the target pane would be respawned with its
+    # start command:
+    # > If shell-command is not given, the command used when the pane was
+    # > created or last respawned is executed
+    extra_args+=("${default_shell}")
   fi
 
   if [[ -n "$DRY_RUN" ]] || [[ -n "$DEBUG" ]]
