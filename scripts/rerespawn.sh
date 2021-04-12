@@ -156,7 +156,7 @@ then
   done
 
   pane_id="$1"
-  if ! pane_cmd=$(get_pane_command "$pane_id")
+  if ! pane_cmd="$(get_pane_command "$pane_id")"
   then
     exit 1
   fi
@@ -179,7 +179,7 @@ then
     extra_args+=(-t "$pane_id")
   fi
 
-  pane_path=$(get_pane_path_from_pane_id "$pane_id")
+  pane_path="$(get_pane_path_from_pane_id "$pane_id")"
 
   if [[ -n "$pane_path" ]]
   then
